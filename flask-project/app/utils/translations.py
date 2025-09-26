@@ -1,0 +1,78 @@
+﻿from __future__ import annotations
+
+STRINGS = {
+    "app_title": "Todo-List",
+    "nav_dashboard": "Home Page",
+    "nav_notifications": "Inbox",
+    "nav_logout": "Sign Out",
+    "nav_profile": "My Profile",
+    "nav_projects": "Projects",
+    "home_welcome": "Welcome back, {name}!",
+    "home_no_projects": "You don't have any projects yet.",
+    "home_create_project": "Create Project",
+    "home_deadlines": "Upcoming deadlines",
+    "button_accept": "Accept",
+    "button_decline": "Decline",
+    "button_view": "View",
+    "button_create": "Create",
+    "button_save": "Save",
+    "button_mark_read": "Mark read",
+    "form_project_name": "Project Name",
+    "form_project_description": "Description",
+    "tasks_header": "Tasks",
+    "task_add": "New Task",
+    "task_edit": "Edit Task",
+    "task_delete": "Delete",
+    "task_due": "Due {date}",
+    "task_unassigned": "Unassigned",
+    "task_title": "Task Title",
+    "status_todo": "To do",
+    "status_in_progress": "In progress",
+    "status_done": "Completed",
+    "profile_heading": "Personal Settings",
+    "profile_name_label": "Display Name",
+    "profile_avatar_label": "Profile Picture",
+    "profile_password_label": "Password",
+    "profile_save": "Save",
+    "profile_upload": "Upload",
+    "profile_update_password": "Update Password",
+    "notifications_title": "Notifications",
+    "notifications_empty": "You're all caught up!",
+    "notification_invite": "{inviter} invited you to join {project}.",
+    "auth_register_title": "Create your account",
+    "auth_register_cta": "Sign up",
+    "auth_have_account": "Already have an account?",
+    "auth_login_title": "Welcome back",
+    "auth_login_cta": "Continue",
+    "auth_need_account": "Need an account?",
+    "auth_otp_title": "Verify your email",
+    "auth_otp_submit": "Verify",
+    "auth_resend_code": "Resend code",
+    "auth_setup_2fa_title": "Secure your account",
+    "auth_setup_2fa_hint": "Scan the QR code with Google Authenticator, then enter the 6-digit code.",
+    "auth_setup_2fa_cta": "Enable",
+    "auth_2fa_title": "Two-factor verification",
+    "form_email": "Email",
+    "form_password": "Password",
+    "form_confirm_password": "Confirm Password",
+    "form_full_name": "Full Name",
+    "form_otp_code": "Verification Code",
+    "form_totp_code": "Authenticator Code",
+    "project_members": "Team",
+    "project_invite": "Invite member",
+    "project_members_empty": "No members yet",
+    "deadline_label": "Deadline",
+    "status_label": "Status",
+    "assignee_label": "Assignee",
+    "description_label": "Description",
+}
+
+
+def translate(key: str, **kwargs) -> str:
+    template = STRINGS.get(key, key)
+    if kwargs:
+        try:
+            return template.format(**kwargs)
+        except KeyError:
+            return template
+    return template

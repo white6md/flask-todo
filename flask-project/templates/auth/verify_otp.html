@@ -1,0 +1,26 @@
+﻿{% extends "base.html" %}
+{% set title = t('auth_otp_title') %}
+
+{% block content %}
+<section class="auth-wrapper">
+    <div class="auth-card">
+        <h1>{{ t('auth_otp_title') }}</h1>
+        <p class="auth-subtitle">{{ email }}</p>
+        <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+            <label class="input-field">
+                <span>{{ t('form_otp_code') }}</span>
+                {{ form.code(class_='input-control', maxlength='6', placeholder='000000') }}
+                {% if form.code.errors %}
+                <small class="error">{{ form.code.errors[0] }}</small>
+                {% endif %}
+            </label>
+            {{ form.submit(class_='btn btn-primary full', value=t('auth_otp_submit')) }}
+        </form>
+        <form method="post" class="resend-form">
+            {{ resend_form.hidden_tag() }}
+            {{ resend_form.submit(class_='btn btn-link', value=t('auth_resend_code')) }}
+        </form>
+    </div>
+</section>
+{% endblock %}

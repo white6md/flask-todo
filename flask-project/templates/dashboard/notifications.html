@@ -1,0 +1,70 @@
+﻿{% extends "base.html" %}
+{% set title = t('notifications_title') %}
+
+{% block content %}
+<section class="notifications card">
+    <header class="notifications-header">
+        <div>
+            <h1>{{ t('notifications_title') }}</h1>
+            <p class="muted">Keep track of invites and reminders at a glance.</p>
+        </div>
+        {% if notifications %}
+        <span class="badge badge-soft">{{ notifications|length }}</span>
+        {% endif %}
+    </header>
+    {% if notifications %}
+        <div class="notification-stack">
+        {% for note in notifications %}
+            <article class="notification-item {% if not note.is_read %}unread{% endif %}">
+                <div class="info">
+                    <div class="title-row">
+                        <span class="status-dot {% if note.type.value == 'deadline' %}deadline{% else %}invite{% endif %}"></span>
+                        <h3>
+                            {% if note.type.value == 'invite' %}
+                                {{ note.payload.inviter_name }} - {{ note.payload.project_name }}
+                            {% elif note.type.value == 'deadline' %}
+                                {{ note.payload.task_title }}
+                            {% else %}
+                                {{ note.type.value|title }}
+                            {% endif %}
+                        </h3>
+                    </div>
+                    <p>
+                        {% if note.type.value == 'invite' %}
+                            {{ t('notification_invite', inviter=note.payload.inviter_name, project=note.payload.project_name) }}
+                        {% elif note.type.value == 'deadline' %}
+                            {% if note.payload.due %}
+                                {{ t('task_due', date=note.payload.due[:16].replace('T', ' ')) }}
+                            {% endif %}
+                        {% endif %}
+                    </p>
+                    <small>{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                </div>
+                <div class="actions">
+                    {% if note.type.value == 'invite' %}
+                    <form method="post" action="{{ url_for('projects.handle_invitation', invitation_id=note.payload.invitation_id, action='accept') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-primary" type="submit">{{ t('button_accept') }}</button>
+                    </form>
+                    <form method="post" action="{{ url_for('projects.handle_invitation', invitation_id=note.payload.invitation_id, action='decline') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-outline" type="submit">{{ t('button_decline') }}</button>
+                    </form>
+                    {% elif note.type.value == 'deadline' %}
+                    <a class="btn btn-outline" href="{{ url_for('projects.detail', project_id=note.payload.project_id) }}">{{ t('button_view') }}</a>
+                    {% endif %}
+                    {% if not note.is_read %}
+                    <form method="post" action="{{ url_for('dashboard.mark_notification_read', notification_id=note.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-text" type="submit">{{ t('button_mark_read') }}</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </article>
+        {% endfor %}
+        </div>
+    {% else %}
+        <p class="empty">{{ t('notifications_empty') }}</p>
+    {% endif %}
+</section>
+{% endblock %}

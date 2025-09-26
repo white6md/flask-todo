@@ -1,0 +1,253 @@
+﻿{% extends "base.html" %}
+{% set title = project.name %}
+
+{% block content %}
+<section class="project-detail" data-project-id="{{ project.id }}" data-csrf="{{ csrf_token() }}" data-project-page>
+    {% set summary = namespace(total=0, done=0, active=0) %}
+    {% for task in tasks %}
+        {% set summary.total = summary.total + 1 %}
+        {% if task.status.value == 'done' %}
+            {% set summary.done = summary.done + 1 %}
+        {% else %}
+            {% set summary.active = summary.active + 1 %}
+        {% endif %}
+    {% endfor %}
+    {% set progress = (summary.done / summary.total * 100) if summary.total else 0 %}
+
+    <div class="project-container">
+        <a class="project-back" href="{{ url_for('dashboard.home') }}" aria-label="Back">
+            <i class="ri-arrow-left-line" aria-hidden="true"></i>
+        </a>
+        <header class="project-hero card">
+            <div class="hero-detail">
+                <p class="hero-eyebrow">{{ t('nav_projects') }}</p>
+                <div class="hero-heading">
+                    <h1>{{ project.name }}</h1>
+                    <span class="status-chip {% if summary.done == summary.total and summary.total > 0 %}success{% elif summary.active > 0 %}warning{% else %}neutral{% endif %}" data-project-status>
+                        {% if summary.total == 0 %}
+                            No tasks
+                        {% elif summary.done == summary.total %}
+                            {{ t('status_done') }}
+                        {% else %}
+                            {{ t('status_in_progress') }}
+                        {% endif %}
+                    </span>
+                </div>
+                <p class="hero-copy">{{ project.description or 'Organize milestones, assign tasks, and keep everyone aligned.' }}</p>
+            </div>
+            <div class="hero-actions">
+                <button class="btn btn-primary" data-modal-open="task-modal" data-mode="create">{{ t('task_add') }}</button>
+                {% if is_owner %}
+                <button class="btn btn-outline" data-modal-open="invite-modal">{{ t('project_invite') }}</button>
+                <form method="post" action="{{ url_for('projects.delete_project', project_id=project.id) }}" class="inline-form" onsubmit="return confirm('Delete this project?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-danger" type="submit">Delete Project</button>
+                </form>
+                {% endif %}
+            </div>
+        </header>
+
+        <section class="project-analytics" data-project-analytics>
+            <article class="metric-card">
+                <span class="metric-label">{{ t('tasks_header') }}</span>
+                <strong class="metric-value" data-project-stat="total">{{ summary.total }}</strong>
+                <span class="metric-sub"><span data-project-stat="done">{{ summary.done }}</span> {{ t('status_done').lower() }}</span>
+                <div class="metric-progress">
+                    <div class="progress-bar" data-project-progress style="width: {{ progress|round(0, 'floor') }}%"></div>
+                </div>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">{{ t('status_in_progress') }}</span>
+                <strong class="metric-value" data-project-stat="active">{{ summary.active }}</strong>
+                <span class="metric-sub">{{ t('status_todo') }}</span>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">{{ t('project_members') }}</span>
+                <strong class="metric-value" data-project-stat="members">{{ members|length }}</strong>
+                <span class="metric-sub">Owner included</span>
+            </article>
+        </section>
+
+        <section class="card team-panel">
+            <header class="panel-header">
+                <div>
+                    <h2>{{ t('project_members') }}</h2>
+                    <p class="muted">Everyone collaborating on this work.</p>
+                </div>
+            </header>
+            <div class="member-grid">
+                {% if members %}
+                    {% for member in members.values() %}
+                    <article class="member-card">
+                        {% if member.avatar_filename %}
+                        <img src="{{ url_for('static', filename='img/avatars/' ~ member.avatar_filename) }}" alt="{{ member.name }}">
+                        {% else %}
+                        <span class="avatar-fallback small">{{ member.initials }}</span>
+                        {% endif %}
+                        <div>
+                            <h3>{{ member.name }}</h3>
+                            {% if project.owner_id == member.id %}
+                            <span class="role-chip owner">Owner</span>
+                            {% endif %}
+                        </div>
+                    </article>
+                    {% endfor %}
+                {% else %}
+                    <p class="empty">{{ t('project_members_empty') }}</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="card board-panel">
+            <header class="panel-header">
+                <div>
+                    <h2>{{ t('tasks_header') }}</h2>
+                    <p class="muted">Drag tasks between columns to update their status.</p>
+                </div>
+            </header>
+            <div class="task-board" data-task-board>
+                {% set columns = [
+                    ('todo', t('status_todo')),
+                    ('in_progress', t('status_in_progress')),
+                    ('done', t('status_done'))
+                ] %}
+                {% for status_value, status_label in columns %}
+                <div class="task-column" data-status="{{ status_value }}">
+                    <header>
+                        <h3>{{ status_label }}</h3>
+                        <span class="column-count" data-column-count="{{ status_value }}">{{ tasks | selectattr('status.value', 'equalto', status_value) | list | length }}</span>
+                    </header>
+                    <div class="tasks">
+                        {% for task in tasks if task.status.value == status_value %}
+                        <article class="task-card" data-task-id="{{ task.id }}" data-status="{{ task.status.value }}" draggable="true">
+                            <div class="task-head">
+                                <h4>{{ task.title }}</h4>
+                                <div class="task-actions">
+                                    <button class="icon-button" data-edit-task
+                                        data-id="{{ task.id }}"
+                                        data-title="{{ task.title }}"
+                                        data-description="{{ task.description|default('') }}"
+                                        data-status="{{ task.status.value }}"
+                                        data-assignee="{{ task.assigned_to_id or 0 }}"
+                                        data-due="{{ task.due_date.strftime('%Y-%m-%dT%H:%M') if task.due_date else '' }}"
+                                    ><i class="ri-edit-line"></i></button>
+                                    {% if is_owner %}
+                                    <form method="post" action="{{ url_for('projects.delete_task', project_id=project.id, task_id=task.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="icon-button danger" type="submit" onclick="return confirm('Delete this task?');"><i class="ri-delete-bin-5-line"></i></button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if task.description %}
+                            <p class="task-desc">{{ task.description }}</p>
+                            {% endif %}
+                            <footer>
+                                <div class="assignee">
+                                    {% set fallback_member = members.get(task.assigned_to_id) %}
+                                    {% set primary_members = task.assignees if task.assignees else ([fallback_member] if fallback_member else []) %}
+                                    {% if primary_members %}
+                                        <div class="avatar-stack">
+                                            {% for member in primary_members %}
+                                                {% if member and member.avatar_filename %}
+                                                <img src="{{ url_for('static', filename='img/avatars/' ~ member.avatar_filename) }}" alt="{{ member.name }}">
+                                                {% elif member %}
+                                                <span class="avatar-fallback small">{{ member.initials }}</span>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                        {% set assignee_names = primary_members | map(attribute='name') | list %}
+                                        <span class="assignee-names">{{ assignee_names | join(', ') }}</span>
+                                    {% else %}
+                                        <span>{{ t('task_unassigned') }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="meta">
+                                    {% if task.due_date %}
+                                    <span class="chip">{{ task.due_date.strftime('%Y-%m-%d %H:%M') }}</span>
+                                    {% endif %}
+                                    <span class="chip subtle">{{ task.status.name.replace('_', ' ').title() }}</span>
+                                </div>
+                            </footer>
+                        </article>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</section>
+
+<div class="modal" id="task-modal" hidden>
+    <div class="modal-dialog" data-title-create="{{ t('task_add') }}" data-title-edit="{{ t('task_edit') }}">
+        <header>
+            <h2 data-task-modal-title>{{ t('task_add') }}</h2>
+            <button type="button" class="modal-close" data-modal-close>&times;</button>
+        </header>
+        <form method="post"
+              action="{{ url_for('projects.create_task', project_id=project.id) }}"
+              class="modal-body"
+              novalidate
+              data-task-form
+              data-create-action="{{ url_for('projects.create_task', project_id=project.id) }}"
+              data-update-template="{{ url_for('projects.update_task', project_id=project.id, task_id=0) }}">
+            {{ task_form.hidden_tag() }}
+            <label class="input-field">
+                <span>{{ t('task_title') }}</span>
+                {{ task_form.title(class_='input-control') }}
+                {% if task_form.title.errors %}
+                <small class="error">{{ task_form.title.errors[0] }}</small>
+                {% endif %}
+            </label>
+            <label class="input-field">
+                <span>{{ t('description_label') }}</span>
+                {{ task_form.description(class_='input-control', rows='3') }}
+            </label>
+            <div class="field-group">
+                <label class="input-field">
+                    <span>{{ t('deadline_label') }}</span>
+                    {{ task_form.due_date(class_='input-control') }}
+                </label>
+                <label class="input-field">
+                    <span>{{ t('status_label') }}</span>
+                    {{ task_form.status(class_='input-control') }}
+                </label>
+            </div>
+            <div class="input-field">
+                <span>{{ t('assignee_label') }}</span>
+                {{ task_form.assignee_id(class_='input-control') }}
+            </div>
+            <footer class="modal-footer">
+                <button type="button" class="btn" data-modal-close>{{ t('button_decline') }}</button>
+                {{ task_form.submit(class_='btn btn-primary', value=t('button_save')) }}
+            </footer>
+        </form>
+    </div>
+</div>
+
+{% if is_owner %}
+<div class="modal" id="invite-modal" hidden>
+    <div class="modal-dialog">
+        <header>
+            <h2>{{ t('project_invite') }}</h2>
+            <button type="button" class="modal-close" data-modal-close>&times;</button>
+        </header>
+        <form method="post" action="{{ url_for('projects.invite_member', project_id=project.id) }}" class="modal-body" novalidate>
+            {{ invite_form.hidden_tag() }}
+            <label class="input-field">
+                <span>{{ t('form_email') }}</span>
+                {{ invite_form.email(class_='input-control') }}
+                {% if invite_form.email.errors %}
+                <small class="error">{{ invite_form.email.errors[0] }}</small>
+                {% endif %}
+            </label>
+            <footer class="modal-footer">
+                <button type="button" class="btn" data-modal-close>{{ t('button_decline') }}</button>
+                {{ invite_form.submit(class_='btn btn-primary', value=t('button_create')) }}
+            </footer>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

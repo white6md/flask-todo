@@ -1,0 +1,29 @@
+﻿{% extends "base.html" %}
+{% set title = t('auth_login_title') %}
+
+{% block content %}
+<section class="auth-wrapper">
+    <div class="auth-card">
+        <h1>{{ t('auth_login_title') }}</h1>
+        <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+            <label class="input-field">
+                <span>{{ t('form_email') }}</span>
+                {{ form.email(class_='input-control') }}
+                {% if form.email.errors %}
+                <small class="error">{{ form.email.errors[0] }}</small>
+                {% endif %}
+            </label>
+            <label class="input-field">
+                <span>{{ t('form_password') }}</span>
+                {{ form.password(class_='input-control') }}
+                {% if form.password.errors %}
+                <small class="error">{{ form.password.errors[0] }}</small>
+                {% endif %}
+            </label>
+            {{ form.submit(class_='btn btn-primary full', value=t('auth_login_cta')) }}
+        </form>
+        <p class="alt-action">{{ t('auth_need_account') }} <a href="{{ url_for('auth.register') }}">{{ t('auth_register_cta') }}</a></p>
+    </div>
+</section>
+{% endblock %}

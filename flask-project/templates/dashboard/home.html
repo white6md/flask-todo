@@ -1,0 +1,156 @@
+﻿{% extends "base.html" %}
+{% set title = t('nav_dashboard') %}
+
+{% block content %}
+<section class="dashboard-view">
+    <div class="dashboard-container">
+        <header class="dashboard-hero card">
+            <div class="hero-content">
+                <p class="hero-eyebrow">{{ t('nav_dashboard') }}</p>
+                <h1>{{ t('home_welcome', name=current_user.name) }}</h1>
+                <p class="hero-copy">Stay on top of every project with a clear overview and fast access to your next priorities.</p>
+            </div>
+            <div class="hero-actions">
+                <button class="btn btn-primary" data-modal-open="project-modal">{{ t('home_create_project') }}</button>
+            </div>
+        </header>
+
+        <section class="dashboard-metrics">
+            <article class="metric-card" data-metric="projects">
+                <span class="metric-label">Total {{ t('nav_projects').lower() }}</span>
+                <strong class="metric-value" data-stat="projects">{{ stats.projects }}</strong>
+                <span class="metric-sub"><span data-stat="owned">{{ stats.owned }}</span> owned</span>
+            </article>
+            <article class="metric-card" data-metric="active">
+                <span class="metric-label">Active tasks</span>
+                <strong class="metric-value" data-stat="active_tasks">{{ stats.active_tasks }}</strong>
+                <span class="metric-sub"><span data-stat="total_tasks">{{ stats.total_tasks }}</span> total</span>
+            </article>
+            <article class="metric-card" data-metric="completed">
+                <span class="metric-label">Completed tasks</span>
+                <strong class="metric-value" data-stat="completed_tasks">{{ stats.completed_tasks }}</strong>
+                <span class="metric-sub">{{ t('status_done') }}</span>
+            </article>
+            <article class="metric-card" data-metric="deadlines">
+                <span class="metric-label">{{ t('home_deadlines') }}</span>
+                <strong class="metric-value" data-stat="deadlines">{{ deadline_notifications|length }}</strong>
+                <span class="metric-sub">Latest 5</span>
+            </article>
+        </section>
+
+        <div class="dashboard-grid">
+            <section class="card projects-panel">
+                <header class="panel-header">
+                    <div>
+                        <h2>{{ t('nav_projects') }}</h2>
+                        <p class="muted">Collaborate effortlessly across every team.</p>
+                    </div>
+                    <span class="badge badge-soft" data-project-count>{{ projects|length }}</span>
+                </header>
+                <div class="projects-collection" data-project-list>
+                    {% if projects %}
+                        {% for entry in projects %}
+                            {% set project = entry.project %}
+                            {% set counts = namespace(total=0, done=0) %}
+                            {% for task in project.tasks %}
+                                {% set counts.total = counts.total + 1 %}
+                                {% if task.status.value == 'done' %}
+                                    {% set counts.done = counts.done + 1 %}
+                                {% endif %}
+                            {% endfor %}
+                            {% set completion = (counts.done / counts.total * 100) if counts.total else 0 %}
+                            <article class="project-card" data-role="{{ entry.role }}" data-project-id="{{ project.id }}">
+                                <div class="project-title">
+                                    <h3>{{ project.name }}</h3>
+                                    <span class="role-chip {% if entry.role == 'owner' %}owner{% else %}member{% endif %}">
+                                        {{ 'Owner' if entry.role == 'owner' else 'Member' }}
+                                    </span>
+                                </div>
+                                <p class="project-summary">{{ project.description or 'Plan your tasks and collaborate effortlessly.' }}</p>
+                                <div class="project-meta">
+                                    <div class="progress-track">
+                                        <div class="progress-bar" style="width: {{ completion|round(0, 'floor') }}%"></div>
+                                    </div>
+                                    <span class="progress-label" data-progress-label>
+                                        {% if counts.total %}
+                                            {{ counts.done }} / {{ counts.total }} {{ t('tasks_header').lower() }}
+                                        {% else %}
+                                            No tasks yet
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="project-actions">
+                                    <a class="btn btn-outline" href="{{ url_for('projects.detail', project_id=project.id) }}">{{ t('button_view') }}</a>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state" data-project-empty>
+                            <p>{{ t('home_no_projects') }}</p>
+                            <button class="btn" data-modal-open="project-modal">{{ t('home_create_project') }}</button>
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <aside class="card deadlines-panel">
+                <header class="panel-header">
+                    <div>
+                        <h2>{{ t('home_deadlines') }}</h2>
+                        <p class="muted">Quick snapshot of what needs attention.</p>
+                    </div>
+                </header>
+                <div class="deadlines-list">
+                    {% if deadline_notifications %}
+                        {% for note in deadline_notifications %}
+                            <article class="deadline-card">
+                                <div>
+                                    <h3>{{ note.payload.task_title }}</h3>
+                                    <p class="muted">{{ note.payload.project_name }}</p>
+                                </div>
+                                {% if note.payload.due %}
+                                    <span class="deadline-time">{{ t('task_due', date=note.payload.due[:16].replace('T', ' ')) }}</span>
+                                {% endif %}
+                            </article>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <p>{{ t('notifications_empty') }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </aside>
+        </div>
+    </div>
+</section>
+
+<div class="modal" id="project-modal" hidden>
+    <div class="modal-dialog">
+        <header>
+            <h2>{{ t('home_create_project') }}</h2>
+            <button type="button" class="modal-close" data-modal-close>&times;</button>
+        </header>
+        <form method="post" action="{{ url_for('projects.create_project') }}" class="modal-body" novalidate data-project-form>
+            {{ project_form.hidden_tag() }}
+            <label class="input-field">
+                <span>{{ t('form_project_name') }}</span>
+                {{ project_form.name(class_='input-control') }}
+                {% if project_form.name.errors %}
+                    <small class="error">{{ project_form.name.errors[0] }}</small>
+                {% endif %}
+            </label>
+            <label class="input-field">
+                <span>{{ t('form_project_description') }}</span>
+                {{ project_form.description(class_='input-control', rows='3') }}
+                {% if project_form.description.errors %}
+                    <small class="error">{{ project_form.description.errors[0] }}</small>
+                {% endif %}
+            </label>
+            <footer class="modal-footer">
+                <button type="button" class="btn" data-modal-close>{{ t('button_decline') }}</button>
+                {{ project_form.submit(class_='btn btn-primary', value=t('button_create')) }}
+            </footer>
+        </form>
+    </div>
+</div>
+{% endblock %}

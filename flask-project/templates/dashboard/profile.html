@@ -1,0 +1,66 @@
+﻿{% extends "base.html" %}
+{% set title = t('nav_profile') %}
+
+{% block content %}
+<section class="profile-settings">
+    <div class="profile-card card">
+        <header class="profile-header">
+            <div>
+                <h1>{{ t('profile_heading') }}</h1>
+                <p class="muted">Review and update your personal details.</p>
+            </div>
+        </header>
+        <div class="profile-grid">
+            <form method="post" class="profile-section profile-panel" novalidate>
+                {{ profile_form.hidden_tag() }}
+                <h2>Profile details</h2>
+                <p class="form-hint">Update how your name appears across the workspace.</p>
+                <label class="input-field">
+                    <span>{{ t('profile_name_label') }}</span>
+                    {{ profile_form.name(class_='input-control') }}
+                    {% if profile_form.name.errors %}
+                    <small class="error">{{ profile_form.name.errors[0] }}</small>
+                    {% endif %}
+                </label>
+                {{ profile_form.submit(class_='btn btn-primary', value=t('profile_save')) }}
+            </form>
+
+            <form method="post" class="profile-section profile-panel" enctype="multipart/form-data">
+                {{ avatar_form.hidden_tag() }}
+                <h2>Avatar</h2>
+                <p class="form-hint">Use a square image (JPG or PNG) for best results.</p>
+                <label class="input-field">
+                    <span>{{ t('profile_avatar_label') }}</span>
+                    {{ avatar_form.avatar(class_='input-control') }}
+                    {% if avatar_form.avatar.errors %}
+                    <small class="error">{{ avatar_form.avatar.errors[0] }}</small>
+                    {% endif %}
+                </label>
+                {{ avatar_form.submit(class_='btn btn-primary', value=t('profile_upload')) }}
+            </form>
+
+            <form method="post" class="profile-section profile-panel" novalidate>
+                {{ password_form.hidden_tag() }}
+                <h2>Password</h2>
+                <p class="form-hint">Choose a strong password with at least 8 characters.</p>
+                <label class="input-field">
+                    <span>Old Password</span>
+                    {{ password_form.current_password(class_='input-control') }}
+                </label>
+                <label class="input-field">
+                    <span>New Password</span>
+                    {{ password_form.new_password(class_='input-control') }}
+                </label>
+                <label class="input-field">
+                    <span>Confirm New Password</span>
+                    {{ password_form.confirm_password(class_='input-control') }}
+                    {% if password_form.confirm_password.errors %}
+                    <small class="error">{{ password_form.confirm_password.errors[0] }}</small>
+                    {% endif %}
+                </label>
+                {{ password_form.submit(class_='btn btn-primary', value=t('profile_update_password')) }}
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}
