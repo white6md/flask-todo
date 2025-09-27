@@ -1,10 +1,7 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import io
-import secrets
-from datetime import datetime, timedelta
-
 import pyotp
 import qrcode
 from flask import (
@@ -19,13 +16,10 @@ from flask import (
 from flask_login import current_user, login_required, login_user, logout_user
 
 from ..extensions import db
-from ..models import OTPToken, User
-from ..utils.email import send_email
+from ..models import User
 from .forms import (
     LoginForm,
-    OTPVerificationForm,
     RegistrationForm,
-    ResendOTPForm,
     TwoFactorForm,
 )
 
@@ -33,30 +27,8 @@ from .forms import (
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
-def _generate_otp_code() -> str:
-    return f"{secrets.randbelow(1_000_000):06d}"
 
 
-def _create_otp(user: User) -> OTPToken:
-    OTPToken.query.filter_by(user_id=user.id, is_used=False).update({"is_used": True})
-    code = _generate_otp_code()
-    expires_at = datetime.utcnow() + timedelta(
-        minutes=current_app.config["OTP_EXPIRATION_MINUTES"]
-    )
-    token = OTPToken(user_id=user.id, code=code, expires_at=expires_at)
-    db.session.add(token)
-    db.session.commit()
-    return token
-
-
-def _send_otp_email(user: User, code: str) -> None:
-    subject = "Your verification code"
-    body = (
-        f"Hello {user.name},\n\n"
-        f"Use the following verification code to complete your registration: {code}\n\n"
-        "The code expires in a few minutes."
-    )
-    send_email(subject=subject, recipients=[user.email], body=body)
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -78,59 +50,14 @@ def register():
                 user.name = form.name.data
 
             user.set_password(form.password.data)
-            user.is_verified = False
+            user.is_verified = True
             db.session.commit()
 
-            otp = _create_otp(user)
-            _send_otp_email(user, otp.code)
-
-            session["pending_user_id"] = user.id
-            flash("Verification code sent. Please check your email.", "info")
-            return redirect(url_for("auth.verify_otp"))
+            flash("Account created. Please sign in to continue.", "success")
+            return redirect(url_for("auth.login"))
 
     return render_template("auth/register.html", form=form)
 
-
-@auth_bp.route("/verify-otp", methods=["GET", "POST"])
-def verify_otp():
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard.home"))
-
-    form = OTPVerificationForm()
-    resend_form = ResendOTPForm()
-    user_id = session.get("pending_user_id")
-    if not user_id:
-        flash("No pending verification found. Please register first.", "warning")
-        return redirect(url_for("auth.register"))
-
-    user = User.query.get_or_404(user_id)
-
-    if form.validate_on_submit():
-        code = form.code.data
-        token = (
-            OTPToken.query.filter_by(user_id=user.id, code=code, is_used=False)
-            .order_by(OTPToken.created_at.desc())
-            .first()
-        )
-        if not token or not token.is_valid():
-            flash("Invalid or expired code.", "danger")
-        else:
-            token.is_used = True
-            user.is_verified = True
-            db.session.commit()
-            session.pop("pending_user_id", None)
-            session["setup_2fa_user_id"] = user.id
-            flash("Email verified! Let's secure your account.", "success")
-            return redirect(url_for("auth.setup_2fa"))
-
-    if resend_form.validate_on_submit():
-        otp = _create_otp(user)
-        _send_otp_email(user, otp.code)
-        flash("A new code has been sent to your email.", "info")
-
-    return render_template(
-        "auth/verify_otp.html", form=form, resend_form=resend_form, email=user.email
-    )
 
 
 def _build_totp_qr_data(user: User) -> str:
@@ -191,15 +118,14 @@ def login():
         user = User.query.filter_by(email=email).first()
         if not user or not user.check_password(form.password.data):
             flash("Invalid credentials.", "danger")
-        elif not user.is_verified:
-            session["pending_user_id"] = user.id
-            flash("Please verify your email first.", "warning")
-            return redirect(url_for("auth.verify_otp"))
-        elif not user.two_factor_secret:
-            session["setup_2fa_user_id"] = user.id
-            flash("Please finish setting up two-factor authentication.", "info")
-            return redirect(url_for("auth.setup_2fa"))
         else:
+            if not user.is_verified:
+                user.is_verified = True
+                db.session.commit()
+            if not user.two_factor_secret:
+                session["setup_2fa_user_id"] = user.id
+                flash("Scan the QR code to finish securing your account.", "info")
+                return redirect(url_for("auth.setup_2fa"))
             session["pre_2fa_user_id"] = user.id
             flash("Enter your authenticator code to continue.", "info")
             return redirect(url_for("auth.verify_2fa"))
